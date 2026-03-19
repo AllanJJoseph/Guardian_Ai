@@ -56,4 +56,4 @@ Never commit your `.env` file to your public repository. A `.gitignore` has been
 Guardian AI is an open-source initiative. We welcome contributions that help improve facial recognition accuracy, mapping tools, and data coordination.
 
 ---
-*Developed for Social Impact & Public Safety.*
+*Developed for Social Impact & Public Safety By SpyderByte.*
