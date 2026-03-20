@@ -4,6 +4,9 @@ Guardian AI is a specialized intelligence platform designed to help NGOs and law
 
 ![System Architecture](./system_architecture.png)
 
+## 🔄 Methodology
+![Intelligence Methodology](./methodology_slide.png)
+
 ## 🚀 Key Features
 
 - **🧠 AI Facial Recognition**: Uses TensorFlow.js to scan photos and videos against a registered database of missing person profiles.
