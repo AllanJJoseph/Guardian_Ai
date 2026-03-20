@@ -9,7 +9,8 @@ import {
   AlertCircle,
   Loader2,
   X,
-  Camera
+  Camera,
+  ShieldCheck
 } from 'lucide-react';
 import { uploadImage, compressImageToBase64, generateFaceEmbedding } from '../services/faceRecognition';
 import { addMissingPerson, updateMissingPerson } from '../services/database';
@@ -213,12 +214,13 @@ const AddMissingPersonForm = ({ isOpen, onClose, onSuccess }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <div className="flex items-center">
-            <div className="p-2 bg-primary-100 rounded-lg mr-3">
-              <User className="h-6 w-6 text-primary-600" />
+            <div className="relative mr-4">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary-600 to-primary-400 rounded-xl blur opacity-25"></div>
+              <img src="/guardian-ai-logo.png" alt="Guardian AI" className="relative h-10 w-10 rounded-xl" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">Add Missing Person</h2>
-              <p className="text-sm text-slate-600">Fill out details and optionally upload a photo</p>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">ADD MISSING PROFILE</h2>
+              <p className="text-[10px] font-bold text-primary-600 tracking-widest uppercase mt-0.5">Intel Registration</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
@@ -337,16 +339,20 @@ const AddMissingPersonForm = ({ isOpen, onClose, onSuccess }) => {
             <button type="submit" disabled={isSubmitting}
               className="flex items-center px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors min-w-[160px] justify-center">
               {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {submitStage === 'analyzing' ? 'Analyzing Face...' :
-                   submitStage === 'uploading' ? 'Uploading Photo...' : 
-                   submitStage === 'converting' ? 'Optimizing Image...' :
-                   submitStage === 'saving' ? 'Saving Record...' : 
-                   'Creating...'}
-                </>
+                <div className="flex items-center space-x-2">
+                  <div className="relative h-4 w-4">
+                    <Loader2 className="absolute inset-0 h-4 w-4 animate-spin" />
+                  </div>
+                  <span className="text-sm font-bold uppercase tracking-wider">
+                    {submitStage === 'analyzing' ? 'Face Mapping...' :
+                     submitStage === 'uploading' ? 'Syncing Media...' : 
+                     submitStage === 'converting' ? 'Optimizing...' :
+                     submitStage === 'saving' ? 'Writing Intel...' : 
+                     'Processing...'}
+                  </span>
+                </div>
               ) : (
-                <><User className="h-4 w-4 mr-2" />Create Missing Person</>
+                <><ShieldCheck className="h-4 w-4 mr-2" /> <span className="uppercase tracking-widest font-black text-xs">Register Profile</span></>
               )}
             </button>
           </div>

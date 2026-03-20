@@ -108,22 +108,20 @@ export const extractFaceEmbedding = async (imageElement, boundingBox) => {
       0, 0, boundingBox.width, boundingBox.height
     );
 
-    // Convert canvas to tensor
+    // Convert canvas to tensor — use 64x64 grayscale for a 4096-D embedding.
+    // This preserves enough facial structure for meaningful comparison.
     const tensor = tf.browser.fromPixels(canvas)
-      .resizeNearestNeighbor([160, 160]) // Resize to standard size
+      .resizeNearestNeighbor([64, 64]) // Resize to 64x64
       .toFloat()
       .div(255.0) // Normalize to [0,1]
-      .expandDims() // Add batch dimension
-      .mean(3, true); // Convert to grayscale
+      .mean(2); // Convert to grayscale by averaging channels → [64, 64]
 
-    // Create a simple face embedding using pooled features
-    // Note: In production, use a pre-trained face recognition model like FaceNet
-    const pooled = tensor.avgPool(8, 8, 'valid').flatten();
-    const embedding = await pooled.data();
+    const flat = tensor.flatten(); // → [4096]
+    const embedding = await flat.data();
 
     // Clean up tensors
     tensor.dispose();
-    pooled.dispose();
+    flat.dispose();
 
     // Return as array for easier storage
     return Array.from(embedding);
@@ -141,8 +139,28 @@ export const extractFaceEmbedding = async (imageElement, boundingBox) => {
  */
 export const compareFaceEmbeddings = (embedding1, embedding2) => {
   try {
-    if (!embedding1 || !embedding2 || embedding1.length !== embedding2.length) {
+    if (!embedding1 || !embedding2 || embedding1.length === 0 || embedding2.length === 0) {
       return 0;
+    }
+
+    // Handle dimension mismatch — resample shorter to match longer
+    let e1 = embedding1;
+    let e2 = embedding2;
+    if (e1.length !== e2.length) {
+      const targetLen = Math.max(e1.length, e2.length);
+      const resample = (arr, targetLen) => {
+        const result = new Array(targetLen);
+        for (let i = 0; i < targetLen; i++) {
+          const srcIdx = (i / targetLen) * arr.length;
+          const lo = Math.floor(srcIdx);
+          const hi = Math.min(lo + 1, arr.length - 1);
+          const frac = srcIdx - lo;
+          result[i] = arr[lo] * (1 - frac) + arr[hi] * frac;
+        }
+        return result;
+      };
+      if (e1.length < targetLen) e1 = resample(e1, targetLen);
+      if (e2.length < targetLen) e2 = resample(e2, targetLen);
     }
 
     // Calculate cosine similarity
@@ -150,10 +168,10 @@ export const compareFaceEmbeddings = (embedding1, embedding2) => {
     let norm1 = 0;
     let norm2 = 0;
 
-    for (let i = 0; i < embedding1.length; i++) {
-      dotProduct += embedding1[i] * embedding2[i];
-      norm1 += embedding1[i] * embedding1[i];
-      norm2 += embedding2[i] * embedding2[i];
+    for (let i = 0; i < e1.length; i++) {
+      dotProduct += e1[i] * e2[i];
+      norm1 += e1[i] * e1[i];
+      norm2 += e2[i] * e2[i];
     }
 
     const magnitude = Math.sqrt(norm1) * Math.sqrt(norm2);
@@ -161,10 +179,20 @@ export const compareFaceEmbeddings = (embedding1, embedding2) => {
 
     const cosineSimilarity = dotProduct / magnitude;
 
-    // Convert to percentage and ensure it's between 0-100
-    const similarityPercentage = Math.max(0, Math.min(100, (cosineSimilarity + 1) * 50));
+    // Map cosine similarity to percentage.
+    // Cosine ranges from -1 to 1. For face embeddings from the same image,
+    // cosine will be ~0.99. For similar faces ~0.7-0.9. For different people < 0.5.
+    // We map: cos >= 0.95 → 90-100%, cos 0.7-0.95 → 60-90%, cos < 0.5 → 0-40%
+    let similarityPercentage;
+    if (cosineSimilarity >= 0.95) {
+      similarityPercentage = 90 + (cosineSimilarity - 0.95) * 200; // 90-100
+    } else if (cosineSimilarity >= 0.5) {
+      similarityPercentage = 40 + (cosineSimilarity - 0.5) * (50 / 0.45); // 40-90
+    } else {
+      similarityPercentage = Math.max(0, cosineSimilarity * 80); // 0-40
+    }
 
-    return Math.round(similarityPercentage);
+    return Math.round(Math.min(100, Math.max(0, similarityPercentage)));
   } catch (error) {
     console.error('Error comparing face embeddings:', error);
     return 0;

@@ -9,6 +9,7 @@ import AddMissingPersonForm from '../components/AddMissingPersonForm';
 import GoogleMapsDirections from '../components/GoogleMapsDirections';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { Shield, Home } from 'lucide-react';
 
 // Fix for default marker icons in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -32,6 +33,15 @@ const MissingPersons = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // 'found' or 'delete'
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showSafeHavens, setShowSafeHavens] = useState(true);
+
+  // Mock Safe Havens (Police Stations & NGOs)
+  const safeHavens = [
+    { id: 'sh1', name: 'Central Police Station', type: 'police', coordinates: [28.6328, 77.2197], address: 'Connaught Place, Delhi' },
+    { id: 'sh2', name: 'Guardian NGO Center', type: 'ngo', coordinates: [28.6129, 77.2295], address: 'India Gate Area, Delhi' },
+    { id: 'sh3', name: 'Hauz Khas Police Station', type: 'police', coordinates: [28.5494, 77.2044], address: 'Hauz Khas, Delhi' },
+    { id: 'sh4', name: 'Asha NGO Shelter', type: 'ngo', coordinates: [28.5672, 77.2100], address: 'South Ext, Delhi' },
+  ];
 
   // Load missing persons from Firebase
   useEffect(() => {
@@ -211,32 +221,33 @@ const MissingPersons = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header with Add Button */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center">
-            <Users className="h-8 w-8 text-orange-600 mr-3" />
+            <div className="relative mr-4">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary-600 to-primary-400 rounded-xl blur opacity-25"></div>
+              <img src="/guardian-ai-logo.png" alt="Guardian AI" className="relative h-12 w-12 rounded-xl border border-white/50 shadow-sm" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Missing Persons Registry</h1>
-              <p className="text-gray-600 mt-1">
-                {loading
-                  ? 'Loading missing persons...'
-                  : `${filteredPersons.length} of ${missingPersons.length} missing persons`
-                }
-              </p>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none uppercase">INTEL REGISTRY</h1>
+              <p className="text-xs font-bold text-primary-600 tracking-[0.2em] mt-1.5 uppercase">Guardian Intelligence Database</p>
             </div>
           </div>
 
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors shadow-md"
+            className="flex items-center px-6 py-3 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all shadow-lg hover:shadow-primary-500/20 transform hover:-translate-y-0.5 group"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Missing Person
+            <Plus className="h-5 w-5 mr-2 group-hover:rotate-90 transition-transform" />
+            <span className="font-bold uppercase tracking-wider text-xs">Register New Profile</span>
           </button>
         </div>
 
-        <p className="text-gray-600">
-          Help us locate missing persons. If you have any information, please report a sighting.
-        </p>
+        <div className="flex items-center justify-between p-4 bg-primary-50 rounded-xl border border-primary-100">
+          <p className="text-sm font-medium text-primary-900 flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2 text-primary-600" />
+            Active Surveillance: {filteredPersons.length} high-priority profiles identified in current search.
+          </p>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -286,6 +297,26 @@ const MissingPersons = () => {
             </select>
           </div>
         </div>
+
+        {/* Safe Havens Toggle */}
+        <div className="mt-4 flex items-center pt-4 border-t border-slate-100">
+          <label className="flex items-center cursor-pointer group">
+            <div className="relative">
+              <input 
+                type="checkbox" 
+                className="sr-only" 
+                checked={showSafeHavens}
+                onChange={() => setShowSafeHavens(!showSafeHavens)} 
+              />
+              <div className={`block w-10 h-6 rounded-full transition-all ${showSafeHavens ? 'bg-primary-600 shadow-lg shadow-primary-500/30' : 'bg-slate-300'}`}></div>
+              <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${showSafeHavens ? 'transform translate-x-4' : ''}`}></div>
+            </div>
+            <div className="ml-3 text-slate-700 font-black text-[10px] uppercase tracking-[0.2em] flex items-center group-hover:text-primary-600 transition-colors">
+              <Shield className="h-3.5 w-3.5 mr-1.5 text-primary-600 animate-pulse" />
+              SURVEILLANCE: SAFE LOCATIONS (POLICE & NGOS)
+            </div>
+          </label>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -332,6 +363,43 @@ const MissingPersons = () => {
                   </Marker>
                 )
               ))}
+
+              {/* Safe Havens Points */}
+              {showSafeHavens && safeHavens.map((haven) => (
+                <Marker 
+                  key={haven.id} 
+                  position={haven.coordinates}
+                  icon={L.divIcon({
+                    className: 'safe-haven-marker',
+                    html: `<div class="p-1 bg-white rounded-full shadow-lg border-2 ${haven.type === 'police' ? 'border-primary-600' : 'border-emerald-500'}">
+                            ${haven.type === 'police' 
+                              ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
+                              : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
+                            }
+                          </div>`,
+                    iconSize: [28, 28]
+                  })}
+                >
+                  <Popup>
+                    <div className="p-2">
+                      <div className="flex items-center mb-1">
+                        <Shield className={`h-4 w-4 mr-1 ${haven.type === 'police' ? 'text-primary-600' : 'text-emerald-600'}`} />
+                        <h3 className="font-bold text-slate-900">{haven.name}</h3>
+                      </div>
+                      <p className="text-[10px] font-black uppercase text-slate-500 mb-2">{haven.type === 'police' ? 'Primary Safe Haven' : 'Community Support Center'}</p>
+                      <p className="text-xs text-slate-600 mb-3">{haven.address}</p>
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${haven.coordinates[0]},${haven.coordinates[1]}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block w-full py-1.5 bg-slate-900 text-white text-center rounded text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800"
+                      >
+                        Get Directions
+                      </a>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
             </MapContainer>
           </div>
 
@@ -340,7 +408,7 @@ const MissingPersons = () => {
             {filteredPersons.map((person) => (
               <div
                 key={person.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                className="bg-white rounded-2xl shadow-soft border border-slate-200 overflow-hidden hover:shadow-medium transition-all group cursor-pointer hover:-translate-y-1"
                 onClick={() => setSelectedPerson(person)}
               >
                 <div className="flex">
@@ -365,30 +433,33 @@ const MissingPersons = () => {
                     </div>
                   </div>
                   <div className="flex-1 p-4">
-                    <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">{person.name}</h3>
-                        <p className="text-sm text-gray-600">
-                          {person.age} years old • {person.gender}
+                        <h3 className="text-xl font-bold text-slate-900 group-hover:text-primary-600 transition-colors uppercase tracking-tight">{person.name}</h3>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-1">
+                          {person.age}Y • {person.gender}
                         </p>
                       </div>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(person.status)}`}>
-                        {person.status === 'active' ? 'Missing' : person.status}
+                      <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-widest rounded border ${
+                        person.status === 'active' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
+                      }`}>
+                        {person.status === 'active' ? 'MISSING' : 'FOUND'}
                       </span>
                     </div>
-                    <div className="space-y-1 mb-3">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 mr-2" />
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center text-xs font-medium text-slate-600">
+                        <MapPin className="h-3.5 w-3.5 mr-2 text-slate-400" />
                         <span>{person.lastSeenLocation || 'Location unknown'}</span>
                       </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Clock className="h-4 w-4 mr-2" />
-                        <span>Last seen {getTimeSince(person.lastSeen)}</span>
+                      <div className="flex items-center text-xs font-medium text-slate-600">
+                        <Clock className="h-3.5 w-3.5 mr-2 text-slate-400" />
+                        <span>Log: {getTimeSince(person.lastSeen)}</span>
                       </div>
                     </div>
-                    <button className="text-sm text-orange-600 font-medium hover:text-orange-700">
-                      View Full Details →
-                    </button>
+                    <div className="pt-3 border-t border-slate-50 flex justify-between items-center text-primary-600 group-hover:text-primary-700 font-bold text-xs uppercase tracking-widest">
+                      <span>Access File</span>
+                      <Navigation className="h-3 w-3 transform group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -2,6 +2,8 @@
 
 Guardian AI is a specialized intelligence platform designed to help NGOs and law enforcement locate missing persons through advanced AI, facial recognition, and spatial analytics. It bridges the gap between public sightings and actionable intelligence.
 
+![System Architecture](./system_architecture.png)
+
 ## 🚀 Key Features
 
 - **🧠 AI Facial Recognition**: Uses TensorFlow.js to scan photos and videos against a registered database of missing person profiles.

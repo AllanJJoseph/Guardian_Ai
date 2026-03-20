@@ -32,9 +32,15 @@ const Layout = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2 group">
-              <img src="/guardian-ai-logo.png" alt="Guardian AI" className="h-9 w-9 rounded-lg" />
-              <span className="text-xl font-bold text-slate-900">Guardian AI</span>
+            <Link to="/" className="flex items-center space-x-3 group">
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary-600 to-primary-400 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                <img src="/guardian-ai-logo.png" alt="Guardian AI" className="relative h-10 w-10 rounded-xl shadow-sm border border-white/50" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-slate-900 tracking-tight leading-none">GUARDIAN</span>
+                <span className="text-[10px] font-bold text-primary-600 tracking-[0.2em] mt-0.5">INTELLIGENCE</span>
+              </div>
             </Link>
 
             {/* Desktop Navigation */}

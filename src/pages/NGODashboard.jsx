@@ -1,5 +1,5 @@
 import { collection, getDocs, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { AlertTriangle, BarChart3, CheckCircle, Clock, FileText, TrendingUp, Users } from 'lucide-react';
+import { AlertTriangle, BarChart3, CheckCircle, Clock, FileText, MapPin, TrendingUp, Users } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../App';
 import { db } from '../firebase';
@@ -13,8 +13,11 @@ const NGODashboard = () => {
   const [liveMissingPersons, setLiveMissingPersons] = useState([]);
   const [liveSightings, setLiveSightings] = useState([]);
   const [newSOSBanner, setNewSOSBanner] = useState(null);
+  const [newSightingBanner, setNewSightingBanner] = useState(null);
   const initialLoadRef = useRef(true);
+  const initialSightingLoadRef = useRef(true);
   const lastSeenIdRef = useRef(null);
+  const lastSeenSightingIdRef = useRef(null);
 
   const [alertsCollSOSAlerts, setAlertsCollSOSAlerts] = useState([]);
   const [sosCollSOSAlerts, setSOSCollSOSAlerts] = useState([]);
@@ -57,7 +60,16 @@ const NGODashboard = () => {
     );
     const unsub2 = onSnapshot(q2, (snapshot) => {
       const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setSOSCollSOSAlerts(items.filter(a => a.status === 'active'));
+      const active = items.filter(a => a.status === 'active');
+      setSOSCollSOSAlerts(active);
+
+      // Banner logic for sosAlerts collection too
+      const latest = active[0] ?? null;
+      if (latest && lastSeenIdRef.current && latest.id !== lastSeenIdRef.current) {
+        setNewSOSBanner(latest);
+        setTimeout(() => setNewSOSBanner(null), 8000);
+      }
+      if (latest) lastSeenIdRef.current = latest.id;
     }, (err) => console.error('sosAlerts listener error (may not exist yet):', err));
 
     return () => { unsub1(); unsub2(); };
@@ -133,6 +145,19 @@ const NGODashboard = () => {
           ...docSnap.data(),
         }));
         setLiveSightings(items.filter((s) => s?.status === 'pending'));
+
+        // Sighting Banner Logic
+        const latest = items[0] ?? null;
+        if (initialSightingLoadRef.current) {
+          initialSightingLoadRef.current = false;
+          lastSeenSightingIdRef.current = latest?.id ?? null;
+          return;
+        }
+        if (latest && lastSeenSightingIdRef.current && latest.id !== lastSeenSightingIdRef.current) {
+          setNewSightingBanner(latest);
+          setTimeout(() => setNewSightingBanner(null), 8000);
+        }
+        lastSeenSightingIdRef.current = latest?.id ?? null;
       },
       (error) => {
         console.error('Sightings listener error:', error);
@@ -231,19 +256,52 @@ const NGODashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* New SOS in-page notification (only while dashboard is open) */}
-      {newSOSBanner && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+      {/* New Sighting in-page notification */}
+      {newSightingBanner && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center">
-                <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-                <h3 className="text-red-900 font-semibold">New SOS Alert</h3>
+            <div className="flex items-start">
+              <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                <MapPin className="h-5 w-5 text-blue-600" />
               </div>
-              <p className="text-sm text-red-800 mt-1">
-                {newSOSBanner?.userName ? `${newSOSBanner.userName} sent an SOS.` : 'A new SOS was received.'}
-              </p>
-              <p className="text-xs text-red-700 mt-1">{formatAlertTime(newSOSBanner?.timestamp)}</p>
+              <div>
+                <h3 className="text-blue-900 font-bold">New Sighting Reported</h3>
+                <p className="text-sm text-blue-800 mt-0.5">
+                  Potential sighting of <span className="font-bold">{newSightingBanner.personName || 'a missing person'}</span> at {newSightingBanner.location}.
+                </p>
+                <p className="text-xs text-blue-700 mt-1">{formatAlertTime(newSightingBanner.reportedAt)}</p>
+              </div>
+            </div>
+
+            {getDirectionsUrl(newSightingBanner) && (
+              <a
+                href={getDirectionsUrl(newSightingBanner)}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium whitespace-nowrap shadow-sm transition-all"
+              >
+                Get Directions
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* New SOS in-page notification */}
+      {newSOSBanner && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 animate-bounce">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start">
+              <div className="p-2 bg-red-100 rounded-lg mr-3">
+                <AlertTriangle className="h-5 w-5 text-red-600 outline-none" />
+              </div>
+              <div>
+                <h3 className="text-red-900 font-black tracking-tight">URGENT SOS ALERT</h3>
+                <p className="text-sm text-red-800 mt-0.5">
+                  {newSOSBanner?.userName ? `${newSOSBanner.userName} is in an emergency situation.` : 'A life-critical emergency alert was received.'}
+                </p>
+                <p className="text-xs text-red-700 mt-1">{formatAlertTime(newSOSBanner?.timestamp)}</p>
+              </div>
             </div>
 
             {getDirectionsUrl(newSOSBanner) && (
@@ -251,9 +309,10 @@ const NGODashboard = () => {
                 href={getDirectionsUrl(newSOSBanner)}
                 target="_blank"
                 rel="noreferrer"
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium whitespace-nowrap"
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-bold whitespace-nowrap shadow-lg flex items-center"
               >
-                Directions
+                <MapPin className="h-4 w-4 mr-1.5" />
+                Get Directions
               </a>
             )}
           </div>

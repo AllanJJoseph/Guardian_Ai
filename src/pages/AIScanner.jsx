@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Upload, Scan, AlertCircle, CheckCircle, MapPin, Clock, Camera, Loader2, User, Users, X, Play, Target } from 'lucide-react';
+import { Upload, Scan, AlertCircle, CheckCircle, MapPin, Clock, Camera, Loader2, User, Users, X, Play, Target, FileText } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { scanMissingPersons, detectFace, extractFrameFromVideo } from '../services/faceRecognition';
 import { addScanResult } from '../services/database';
 import { format } from 'date-fns';
+import exifr from 'exifr';
 
 const AIScanner = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]); // Array of { file, preview, type, detected }
@@ -14,6 +15,30 @@ const AIScanner = () => {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [activeFileIndex, setActiveFileIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('new-scan'); // 'new-scan' or 'history'
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadScanHistory();
+    }
+  }, [activeTab]);
+
+  const loadScanHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const { getScanResults } = await import('../services/database');
+      const res = await getScanResults({ limit: 20 });
+      if (res.success) {
+        setHistory(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load scan history:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -25,6 +50,7 @@ const AIScanner = () => {
     const newFiles = await Promise.all(files.map(async (file) => {
       let preview = '';
       let faceDetected = false;
+      let gpsCoordinates = null;
 
       if (file.type.startsWith('image/')) {
         preview = await new Promise(res => {
@@ -34,13 +60,23 @@ const AIScanner = () => {
         });
         const detection = await detectFace(preview);
         faceDetected = detection.faceDetected;
+
+        // Extract GPS coordinates from EXIF metadata
+        try {
+          const exifData = await exifr.gps(file);
+          if (exifData && exifData.latitude && exifData.longitude) {
+            gpsCoordinates = [exifData.latitude, exifData.longitude];
+            console.log(`📍 GPS extracted from ${file.name}: [${gpsCoordinates}]`);
+          }
+        } catch (exifErr) {
+          console.log(`No GPS data in ${file.name}`);
+        }
       } else if (file.type.startsWith('video/')) {
         preview = URL.createObjectURL(file);
-        // For video, we assume we might find faces during scan
         faceDetected = true; 
       }
 
-      return { file, preview, type: file.type.split('/')[0], faceDetected };
+      return { file, preview, type: file.type.split('/')[0], faceDetected, gpsCoordinates };
     }));
 
     setUploadedFiles(prev => [...prev, ...newFiles]);
@@ -73,7 +109,9 @@ const AIScanner = () => {
             scanResult.matches.forEach(m => {
               const existing = allMatches.get(m.personId);
               if (!existing || m.similarity > existing.similarity) {
-                allMatches.set(m.personId, { ...m, sourceFile: fileData.file.name });
+                // Use EXIF GPS coordinates from the uploaded photo if available
+                const coords = fileData.gpsCoordinates || m.coordinates;
+                allMatches.set(m.personId, { ...m, sourceFile: fileData.file.name, coordinates: coords });
               }
             });
             totalScanned += scanResult.totalScanned;
@@ -205,9 +243,33 @@ const AIScanner = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Upload Section */}
-          <div className="lg:col-span-1">
+        {/* Tabs for Navigation */}
+        <div className="flex space-x-4 mb-8">
+          <button
+            onClick={() => setActiveTab('new-scan')}
+            className={`px-6 py-2 rounded-full font-semibold transition-all ${
+              activeTab === 'new-scan'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            New Intelligence Scan
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-6 py-2 rounded-full font-semibold transition-all ${
+              activeTab === 'history'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Intelligence History
+          </button>
+        </div>
+
+        {activeTab === 'new-scan' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* ... Upload Section ... */}
             <div className="bg-white rounded-2xl shadow-soft p-6 border border-slate-200 sticky top-8">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Upload Media</h2>
 
@@ -328,7 +390,6 @@ const AIScanner = () => {
                 </ul>
               </div>
             </div>
-          </div>
 
           {/* Results Section */}
           <div className="lg:col-span-2">
@@ -496,6 +557,60 @@ const AIScanner = () => {
             )}
           </div>
         </div>
+      ) : (
+          /* History View */
+          <div className="bg-white rounded-2xl shadow-soft border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-xl font-bold text-slate-900">Archived Intelligence Results</h2>
+              <p className="text-sm text-slate-500">Recently saved AI match records</p>
+            </div>
+            
+            {loadingHistory ? (
+              <div className="p-12 text-center">
+                <Loader2 className="h-10 w-10 text-primary-600 animate-spin mx-auto mb-4" />
+                <p className="text-slate-600">Retrieving intelligence archives...</p>
+              </div>
+            ) : history.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {history.map((item) => (
+                  <div key={item.id} className="p-6 hover:bg-slate-50 transition-colors flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-12 w-12 rounded-lg bg-slate-100 overflow-hidden">
+                        <img src={item.uploadedImageUrl} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <div className="flex items-center">
+                          <h3 className="font-bold text-slate-900">{item.scannedPersonName}</h3>
+                          <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold">
+                            {item.similarity}% MATCH
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 flex items-center mt-1">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {item.location || 'Unknown Location'} • {format(item.createdAt.toDate(), 'MMM d, h:mm a')}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setResults({ matches: [item], matchesFound: 1, totalScanned: 'N/A' });
+                        setActiveTab('new-scan');
+                      }}
+                      className="px-4 py-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                    >
+                      View Report
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-12 text-center">
+                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-600">No archived intelligence found</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
